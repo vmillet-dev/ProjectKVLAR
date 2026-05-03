@@ -58,16 +58,31 @@ void ACityBuilderCameraPawn::Tick(float DeltaTime)
  
 void ACityBuilderCameraPawn::Move(const FInputActionValue& Value)
 {
-	FVector2D Input = Value.Get<FVector2D>();
-	FRotator Rotation = SpringArmComponent->GetRelativeRotation();
-	FRotator YawRotation(0, Rotation.Yaw, 0);
+	const FVector2D Input = Value.Get<FVector2D>();
+	const FRotator Rotation = SpringArmComponent->GetRelativeRotation();
+	const FRotator YawRotation(0, Rotation.Yaw, 0);
 
-	FVector Forward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	FVector Right   = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+	const FVector Forward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+	const FVector Right   = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-	FVector MoveDirection = (Forward * Input.X) + (Right * -Input.Y);
-	
-	AddActorWorldOffset(MoveDirection.GetSafeNormal() * MoveSpeed * GetWorld()->GetDeltaSeconds(), true);
+	const FVector MoveDirection = (Forward * Input.X) + (Right * -Input.Y);
+
+	float SpeedMultiplier = 1.f;
+	if (bScaleMoveSpeedWithZoom)
+	{
+		const float CurrentArmLength = SpringArmComponent->TargetArmLength;
+		const float T = FMath::GetMappedRangeValueClamped(
+			FVector2D(MinArmLength, MaxArmLength),
+			FVector2D(0.f, 1.f),
+			CurrentArmLength
+		);
+		SpeedMultiplier = FMath::Lerp(1.5f, 8.f, T * T);
+	}
+
+	AddActorWorldOffset(
+		MoveDirection.GetSafeNormal() * MoveSpeed * SpeedMultiplier * GetWorld()->GetDeltaSeconds(),
+		true
+	);
 }
 
  
