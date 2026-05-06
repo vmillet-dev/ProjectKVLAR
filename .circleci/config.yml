@@ -19,10 +19,13 @@ jobs:
       - run:
           name: Pull Unreal Engine image
           no_output_timeout: 40m
-          command: docker pull ghcr.io/vmillet-dev/unreal-engine:5.7.4
+          command: |
+            echo "Pulling image: ghcr.io/$GITHUB_USERNAME/$UE5_DOCKER_IMAGE"
+            docker pull ghcr.io/$GITHUB_USERNAME/$UE5_DOCKER_IMAGE
       
       - run:
           name: Build and Cook UE Project
+          no_output_timeout: 40m
           command: |
             $projectPath = "C:\$env:PROJECT_NAME"
             $checkoutPath = $PWD.Path
