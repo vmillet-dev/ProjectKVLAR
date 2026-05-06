@@ -20,7 +20,7 @@ jobs:
           name: Pull Unreal Engine image
           no_output_timeout: 40m
           command: |
-            echo "Pulling image: ghcr.io/$GITHUB_USERNAME/$UE5_DOCKER_IMAGE"
+            echo "Pulling image: ghcr.io/${GITHUB_USERNAME}/${UE5_DOCKER_IMAGE}"
             docker pull ghcr.io/$GITHUB_USERNAME/$UE5_DOCKER_IMAGE
       
       - run:
