@@ -1,32 +1,78 @@
 # CityBuilder
 
-Developed with Unreal Engine 5
+Unreal Engine 5 project with automated build and release pipeline.
 
-## Building UE5 Windows Docker Image
+---
 
-### About this workaround
+## CI/CD
 
-Building a Docker image from Unreal Engine normally requires compiling the engine
-from source, which involves linking your GitHub account to your Epic Games account
-and cloning the private UE5 repository — a process that can take several hours.
+The project uses CircleCI to automate build, packaging, and release workflows for Windows targets.
 
-To avoid this, the files located in the `.docker` folder are designed to be placed
-directly at the root of your local Unreal Engine installation directory
-(e.g. `C:\Program Files\Epic Games\UE_5.7`), downloaded via the Epic Games Launcher.
-This allows Docker to copy the pre-built engine binaries directly from your local
-installation, completely bypassing the source compilation step.
+To avoid compiling Unreal Engine from source during CI execution, the pipeline relies on a prebuilt Docker image containing a local Unreal Engine installation.
 
-### Goal
+### UE5 Docker Image Setup
 
-The goal is to produce a ready-to-use Docker image that can be pushed to a container
-registry and pulled by a **CircleCI pipeline** to automate the build and packaging
-of the project without requiring any local UE5 installation on the CI runner.
+#### Prerequisites
 
-### Steps
+* Unreal Engine `5.7` installed via Epic Games Launcher
+* Docker installed
+* Access to GitHub Container Registry (GHCR)
 
-- Install Unreal Engine `5.7` via the Epic Games Launcher
-- Copy the contents of the `.docker` folder to the root of your UE installation
-  (e.g. `C:\Program Files\Epic Games\UE_5.7`)
-- Build the Docker image from that directory
-- Push the image to your container registry (e.g. `ghcr.io`)
-- The CircleCI pipeline will automatically pull and use it on every build
+#### Build the Image
+
+1. Copy the `.docker` directory into the root of your UE installation:
+
+```bash id="bgx3me"
+xcopy /E /I .docker "C:\Program Files\Epic Games\UE_5.7"
+```
+
+2. Authenticate to GHCR:
+
+```bash id="c3d6zf"
+echo YOUR_GITHUB_TOKEN | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
+
+3. Build the Docker image:
+
+```bash id="tmjv6g"
+cd "C:\Program Files\Epic Games\UE_5.7"
+
+docker build -t ghcr.io/YOUR_GITHUB_USERNAME/ue5-windows:5.7 .
+```
+
+4. Push the image:
+
+```bash id="bspdz0"
+docker push ghcr.io/YOUR_GITHUB_USERNAME/ue5-windows:5.7
+```
+
+> Rebuild the image only when upgrading the Unreal Engine version.
+
+### Pipeline Workflow
+
+On each push to `main`, CircleCI:
+
+1. Pulls the UE5 Docker image
+2. Runs `BuildCookRun`
+3. Packages the project for Windows Shipping (64-bit)
+4. Archives the build as `.zip`
+5. Uploads artifacts to CircleCI
+6. Publishes the build to a GitHub Release
+
+### CircleCI Environment Variables
+
+Configure the following variables inside the `github` context:
+
+| Variable           | Description                                                        |
+| ------------------ | ------------------------------------------------------------------ |
+| `GITHUB_TOKEN`     | GitHub token with `read:packages` and `write:packages` permissions |
+| `GITHUB_USERNAME`  | GitHub username                                                    |
+| `UE5_DOCKER_IMAGE` | UE5 Docker image reference                                         |
+| `PROJECT_NAME`     | Unreal project name (`.uproject`)                                  |
+
+#### Example
+
+```text id="lnvuzq"
+UE5_DOCKER_IMAGE=ghcr.io/yourname/ue5-windows:5.7
+PROJECT_NAME=CityBuilder
+```

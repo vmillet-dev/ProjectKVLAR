@@ -154,7 +154,6 @@ workflows:
           context: github
           filters:
             branches:
-              only:
-                - main
-                - develop
-                - feat-add-dockerfile
+              ignore: /.*/
+            tags:
+              only: /.*/
