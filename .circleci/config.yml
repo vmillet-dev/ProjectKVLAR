@@ -19,7 +19,7 @@ jobs:
       - run:
           name: Pull Unreal Engine image
           no_output_timeout: 40m
-          command: docker pull ghcr.io/$env:UE5_DOCKER_IMAGE
+          command: docker pull ghcr.io/$env:GITHUB_USERNAME/$env:UE5_DOCKER_IMAGE
       
       - run:
           name: Build and Cook UE Project
@@ -27,7 +27,7 @@ jobs:
             $projectPath = "C:\$env:PROJECT_NAME"
             $checkoutPath = $PWD.Path
             
-            docker run --rm -v "${checkoutPath}:${projectPath}" $env:UE5_DOCKER_IMAGE `
+            docker run --rm -v "${checkoutPath}:${projectPath}" ghcr.io/$env:GITHUB_USERNAME/$env:UE5_DOCKER_IMAGE `
               Engine\Build\BatchFiles\RunUAT.bat BuildCookRun `
               -project="${projectPath}\$env:PROJECT_NAME.uproject" `
               -noP4 `
@@ -153,6 +153,7 @@ workflows:
           context: github
           filters:
             branches:
-              ignore: /.*/
-            tags:
-              only: /.*/
+              only:
+                - main
+                - develop
+                - feat-add-dockerfile
