@@ -9,29 +9,29 @@ jobs:
       name: win/server-2022
       size: large
       shell: powershell.exe
+      
     steps:
       - checkout
 
       - run:
-          name: Docker Login
-          command: echo $env:GITHUB_TOKEN | docker login ghcr.io -u $env:GITHUB_USERNAME --password-stdin  
-      
+          name: Authenticate Docker
+          command: echo $env:GITHUB_TOKEN | docker login ghcr.io -u $env:GITHUB_USERNAME --password-stdin
+
       - run:
-          name: Pull Unreal Engine image
+          name: Pull UE5 Image
           no_output_timeout: 40m
           command: docker pull $env:UE5_DOCKER_IMAGE
-      
+
       - run:
-          name: Build and Cook UE Project
+          name: Build and Package Project
           no_output_timeout: 40m
           command: |
-            $projectPath = "C:\$env:PROJECT_NAME"
-            $checkoutPath = $PWD.Path
-            
-            docker run --rm -v "${checkoutPath}:${projectPath}" $env:UE5_DOCKER_IMAGE `
+            $projectRoot = "C:\$env:PROJECT_NAME"
+            $workspace = $PWD.Path
+
+            docker run --rm -v "${workspace}:${projectRoot}" $env:UE5_DOCKER_IMAGE `
               Engine\Build\BatchFiles\RunUAT.bat BuildCookRun `
-              -project="${projectPath}\$env:PROJECT_NAME.uproject" `
-              -noP4 `
+              -project="${projectRoot}\$env:PROJECT_NAME.uproject" `
               -platform=Win64 `
               -clientconfig=Shipping `
               -build `
@@ -41,110 +41,71 @@ jobs:
               -pak `
               -compressed `
               -archive `
-              -archivedirectory="${projectPath}\Build" `
+              -archivedirectory="${projectRoot}\Build" `
               -nodebuginfo `
-              -encryptinifiles
-      
+              -encryptinifiles `
+              -noP4
+
       - run:
-          name: Zip Build Output
+          name: Archive Build
           command: |
             $buildPath = "Build\Windows"
-            $zipName = "$env:PROJECT_NAME-Windows.zip"
-            $zipPath = "Build\$zipName"
-            
-            Write-Host "Compressing build output from $buildPath"
-            
-            if (Test-Path $buildPath) {
-              Compress-Archive -Path "$buildPath\*" -DestinationPath $zipPath -Force
-              Write-Host "Build archived to $zipPath"
-              
-              # Créer un fichier avec le nom pour l'utiliser plus tard
-              $zipName | Out-File -FilePath "Build\artifact-name.txt" -Encoding utf8
-            } else {
-              Write-Error "Build path $buildPath not found"
-              exit 1
+            $archive = "Build\$env:PROJECT_NAME-Windows.zip"
+
+            if (-not (Test-Path $buildPath)) {
+              throw "Build output not found: $buildPath"
             }
-      
+
+            Compress-Archive -Path "$buildPath\*" -DestinationPath $archive -Force
+
+            $archive | Out-File "Build\artifact.txt"
+
       - run:
-          name: List Build Directory
+          name: Publish GitHub Release
           command: |
-            Write-Host "Contents of Build directory:"
-            Get-ChildItem -Path "Build" -Recurse | Select-Object FullName
-      
-      - store_artifacts:
-          path: Build
-          destination: unreal-build
-      
-      - run:
-          name: Upload to GitHub Release
-          command: |
-            $zipName = Get-Content "Build\artifact-name.txt"
-            $zipPath = "Build\$zipName"
-            $tag = $env:CIRCLE_TAG
+            $artifact = Get-Content "Build\artifact.txt"
             $repo = "$env:CIRCLE_PROJECT_USERNAME/$env:CIRCLE_PROJECT_REPONAME"
-            
-            # Si pas de tag, utiliser le numéro de build
-            if ([string]::IsNullOrEmpty($tag)) {
-              $tag = "build-$env:CIRCLE_BUILD_NUM"
-              Write-Host "No tag found, using: $tag"
+
+            $tag = if ($env:CIRCLE_TAG) {
+              $env:CIRCLE_TAG
+            } else {
+              "build-$env:CIRCLE_BUILD_NUM"
             }
-            
-            Write-Host "Uploading $zipPath to GitHub release $tag"
-            
-            # Vérifier si le fichier existe
-            if (-not (Test-Path $zipPath)) {
-              Write-Error "Build archive not found at $zipPath"
-              exit 1
-            }
-            
-            # Créer ou obtenir la release
+
             $headers = @{
-              "Authorization" = "token $env:GITHUB_TOKEN"
-              "Accept" = "application/vnd.github.v3+json"
+              Authorization = "token $env:GITHUB_TOKEN"
+              Accept        = "application/vnd.github.v3+json"
             }
-            
-            # Vérifier si la release existe
-            $releaseUrl = "https://api.github.com/repos/$repo/releases/tags/$tag"
-            
+
             try {
-              $release = Invoke-RestMethod -Uri $releaseUrl -Headers $headers -Method Get -ErrorAction Stop
-              Write-Host "Release $tag already exists (ID: $($release.id))"
-            } catch {
-              Write-Host "Creating new release for tag $tag"
-              
-              $releaseData = @{
-                tag_name = $tag
-                name = "$env:PROJECT_NAME - $tag"
-                body = "Automated build from CircleCI`n`nBuild #$env:CIRCLE_BUILD_NUM`nCommit: $env:CIRCLE_SHA1"
-                draft = $false
+              $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/$tag" -Headers $headers -Method Get
+            }
+            catch {
+              $body = @{
+                tag_name  = $tag
+                name      = "$env:PROJECT_NAME - $tag"
+                body      = "Automated CircleCI build`nCommit: $env:CIRCLE_SHA1"
                 prerelease = $true
               } | ConvertTo-Json
-              
-              $createUrl = "https://api.github.com/repos/$repo/releases"
-              $release = Invoke-RestMethod -Uri $createUrl -Headers $headers -Method Post -Body $releaseData -ContentType "application/json"
-              Write-Host "Release created (ID: $($release.id))"
+
+              $release = Invoke-RestMethod `
+                -Uri "https://api.github.com/repos/$repo/releases" `
+                -Headers $headers `
+                -Method Post `
+                -Body $body `
+                -ContentType "application/json"
             }
-            
-            # Upload de l'asset
-            $uploadUrl = $release.upload_url -replace '\{\?name,label\}', "?name=$zipName"
-            
-            Write-Host "Uploading to: $uploadUrl"
-            
-            $fileBytes = [System.IO.File]::ReadAllBytes((Resolve-Path $zipPath).Path)
-            $uploadHeaders = @{
-              "Authorization" = "token $env:GITHUB_TOKEN"
-              "Content-Type" = "application/zip"
-            }
-            
-            try {
-              $uploadResult = Invoke-RestMethod -Uri $uploadUrl -Headers $uploadHeaders -Method Post -Body $fileBytes
-              Write-Host "Upload completed successfully!"
-              Write-Host "Download URL: $($uploadResult.browser_download_url)"
-            } catch {
-              Write-Error "Upload failed: $_"
-              Write-Error $_.Exception.Response
-              exit 1
-            }
+
+            $uploadUrl = $release.upload_url -replace '\{\?name,label\}', "?name=$(Split-Path $artifact -Leaf)"
+
+            Invoke-RestMethod `
+              -Uri $uploadUrl `
+              -Headers @{
+                Authorization = "token $env:GITHUB_TOKEN"
+                "Content-Type" = "application/zip"
+              } `
+              -Method Post `
+              -Body ([System.IO.File]::ReadAllBytes((Resolve-Path $artifact)))
 
 workflows:
   version: 2
@@ -154,6 +115,7 @@ workflows:
           context: github
           filters:
             branches:
-              ignore: /.*/
-            tags:
-              only: /.*/
+              only:
+                - main
+                - develop
+                - feat-add-dockerfile

@@ -12,7 +12,6 @@ COPY --from=ddl \
     C:/Windows/System32/dxva2.dll \
     C:/Windows/System32/glu32.dll \
     C:/Windows/System32/InputHost.dll \
-    C:/Windows/System32/ksuser.dll \
     C:/Windows/System32/mf.dll \
     C:/Windows/System32/mfcore.dll \
     C:/Windows/System32/mfplat.dll \
@@ -29,7 +28,7 @@ COPY --from=ddl \
     C:/Windows/System32/
 
 
-RUN powershell -Command "Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -Value 1"
+RUN reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
 
 RUN powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:chocolateyVersion = '1.4.0'; Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))"
 
