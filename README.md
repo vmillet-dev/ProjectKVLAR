@@ -50,14 +50,12 @@ docker push ghcr.io/YOUR_GITHUB_USERNAME/ue5-windows:5.7
 
 ### Pipeline Workflow
 
-On each push to `main`, CircleCI:
+On each push of tags, CircleCI:
 
 1. Pulls the UE5 Docker image
-2. Runs `BuildCookRun`
-3. Packages the project for Windows Shipping (64-bit)
-4. Archives the build as `.zip`
-5. Uploads artifacts to CircleCI
-6. Publishes the build to a GitHub Release
+2. Runs `BuildCookRun` and packages the project for Windows Shipping (64-bit)
+3. Archives the build as `.zip`
+4. Publishes the build to a GitHub Release
 
 ### CircleCI Environment Variables
 
