@@ -1,0 +1,120 @@
+version: 2.1
+
+orbs:
+  win: circleci/windows@5.0
+
+jobs:
+  build-unreal-project:
+    executor:
+      name: win/server-2022
+      size: large
+      shell: powershell.exe
+      
+    steps:
+      - checkout
+
+      - run:
+          name: Authenticate Docker
+          command: echo $env:GITHUB_TOKEN | docker login ghcr.io -u $env:GITHUB_USERNAME --password-stdin
+
+      - run:
+          name: Pull UE5 Image
+          no_output_timeout: 40m
+          command: docker pull $env:UE5_DOCKER_IMAGE
+
+      - run:
+          name: Build and Package Project
+          no_output_timeout: 40m
+          command: |
+            $projectRoot = "C:\$env:PROJECT_NAME"
+            $workspace = $PWD.Path
+
+            docker run --rm -v "${workspace}:${projectRoot}" $env:UE5_DOCKER_IMAGE `
+              Engine\Build\BatchFiles\RunUAT.bat BuildCookRun `
+              -project="${projectRoot}\$env:PROJECT_NAME.uproject" `
+              -platform=Win64 `
+              -clientconfig=Shipping `
+              -build `
+              -cook `
+              -stage `
+              -package `
+              -pak `
+              -compressed `
+              -archive `
+              -archivedirectory="${projectRoot}\Build" `
+              -nodebuginfo `
+              -encryptinifiles `
+              -noP4
+
+      - run:
+          name: Archive Build
+          command: |
+            $buildPath = "Build\Windows"
+            $archive = "Build\$env:PROJECT_NAME-Windows.zip"
+
+            if (-not (Test-Path $buildPath)) {
+              throw "Build output not found: $buildPath"
+            }
+
+            Compress-Archive -Path "$buildPath\*" -DestinationPath $archive -Force
+
+            $archive | Out-File "Build\artifact.txt"
+
+      - run:
+          name: Publish GitHub Release
+          command: |
+            $artifact = Get-Content "Build\artifact.txt"
+            $repo = "$env:CIRCLE_PROJECT_USERNAME/$env:CIRCLE_PROJECT_REPONAME"
+
+            $tag = if ($env:CIRCLE_TAG) {
+              $env:CIRCLE_TAG
+            } else {
+              "build-$env:CIRCLE_BUILD_NUM"
+            }
+
+            $headers = @{
+              Authorization = "token $env:GITHUB_TOKEN"
+              Accept        = "application/vnd.github.v3+json"
+            }
+
+            try {
+              $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/$tag" -Headers $headers -Method Get
+            }
+            catch {
+              $body = @{
+                tag_name  = $tag
+                name      = "$env:PROJECT_NAME - $tag"
+                body      = "Automated CircleCI build`nCommit: $env:CIRCLE_SHA1"
+                prerelease = $true
+              } | ConvertTo-Json
+
+              $release = Invoke-RestMethod `
+                -Uri "https://api.github.com/repos/$repo/releases" `
+                -Headers $headers `
+                -Method Post `
+                -Body $body `
+                -ContentType "application/json"
+            }
+
+            $uploadUrl = $release.upload_url -replace '\{\?name,label\}', "?name=$(Split-Path $artifact -Leaf)"
+
+            Invoke-RestMethod `
+              -Uri $uploadUrl `
+              -Headers @{
+                Authorization = "token $env:GITHUB_TOKEN"
+                "Content-Type" = "application/zip"
+              } `
+              -Method Post `
+              -Body ([System.IO.File]::ReadAllBytes((Resolve-Path $artifact)))
+
+workflows:
+  version: 2
+  build-workflow:
+    jobs:
+      - build-unreal-project:
+          context: github
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /.*/
