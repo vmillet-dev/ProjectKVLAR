@@ -3,6 +3,8 @@ DerivedDataCache
 Intermediate
 Saved
 .vscode
+.vsconfig
+.idea
 .vs
 *.VC.db
 *.opensdf
@@ -12,5 +14,5 @@ Saved
 *.suo
 *.xcodeproj
 *.xcworkspace
-.idea
-.vsconfig
+*.sln.*
+*.log

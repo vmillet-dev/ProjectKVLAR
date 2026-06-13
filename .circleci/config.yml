@@ -18,6 +18,21 @@ jobs:
           command: echo $env:GITHUB_TOKEN | docker login ghcr.io -u $env:GITHUB_USERNAME --password-stdin
 
       - run:
+          name: Inject EOS credentials into DefaultEngine.ini
+          command: |
+            $ini = "Config\DefaultEngine.ini"
+            $c = Get-Content $ini -Raw
+            $c = $c `
+              -replace '<NOM>',          $env:EOS_ARTIFACT_NAME `
+              -replace '<CLIENT_ID>',    $env:EOS_CLIENT_ID `
+              -replace '<CLIENT_SECRET>', $env:EOS_CLIENT_SECRET `
+              -replace '<PRODUCT_ID>',   $env:EOS_PRODUCT_ID `
+              -replace '<SANDBOX_ID>',   $env:EOS_SANDBOX_ID `
+              -replace '<DEPLOYMENT_ID>', $env:EOS_DEPLOYMENT_ID `
+              -replace '<64 char hex>',  $env:EOS_ENCRYPTION_KEY
+            Set-Content $ini $c -Encoding UTF8
+
+      - run:
           name: Pull UE5 Image
           no_output_timeout: 40m
           command: docker pull $env:UE5_DOCKER_IMAGE
