@@ -5,7 +5,8 @@
 #include "ServerRowWidget.h"
 #include "AudioOptionsWidget.h"
 #include "OnlineSessionSubsystem.h"
-#include "Components/Button.h"
+#include "Base/KUPButton.h"
+#include "Components/Widget.h"
 #include "Components/EditableTextBox.h"
 #include "Components/TextBlock.h"
 #include "Components/ScrollBox.h"
@@ -14,6 +15,12 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Settings/GameMapSettings.h"
+
+UMainMenuWidget::UMainMenuWidget()
+{
+	// Receive "Back" actions so sub-panels can return to the root (see NativeOnHandleBackAction).
+	bIsBackHandler = true;
+}
 
 UOnlineSessionSubsystem* UMainMenuWidget::GetOnline() const
 {
@@ -33,17 +40,18 @@ void UMainMenuWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// Bind every button. The three "Back" buttons share a single handler.
-	if (SoloButton)            SoloButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnSoloClicked);
-	if (MultiplayerButton)     MultiplayerButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnMultiplayerClicked);
-	if (OptionsButton)         OptionsButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnOptionsClicked);
-	if (QuitButton)            QuitButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnQuitClicked);
-	if (CreateButton)          CreateButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnCreateClicked);
-	if (JoinButton)            JoinButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnJoinClicked);
-	if (RefreshButton)         RefreshButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnRefreshClicked);
-	if (MultiplayerBackButton) MultiplayerBackButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnBackToRootClicked);
-	if (OptionsBackButton)     OptionsBackButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnBackToRootClicked);
-	if (BrowserBackButton)     BrowserBackButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnBackToRootClicked);
+	// Bind every button. The three "Back" buttons share a single handler. CommonUI buttons expose a
+	// native OnClicked() event (not the dynamic UButton delegate), so bind with AddUObject.
+	if (SoloButton)            SoloButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnSoloClicked);
+	if (MultiplayerButton)     MultiplayerButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnMultiplayerClicked);
+	if (OptionsButton)         OptionsButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnOptionsClicked);
+	if (QuitButton)            QuitButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnQuitClicked);
+	if (CreateButton)          CreateButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnCreateClicked);
+	if (JoinButton)            JoinButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnJoinClicked);
+	if (RefreshButton)         RefreshButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnRefreshClicked);
+	if (MultiplayerBackButton) MultiplayerBackButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnBackToRootClicked);
+	if (OptionsBackButton)     OptionsBackButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnBackToRootClicked);
+	if (BrowserBackButton)     BrowserBackButton->OnClicked().AddUObject(this, &UMainMenuWidget::OnBackToRootClicked);
 
 	// Listen to the online subsystem so the UI reacts to async EOS results.
 	if (UOnlineSessionSubsystem* Online = GetOnline())
@@ -64,57 +72,40 @@ void UMainMenuWidget::ShowPanel(EMenuPanel Panel)
 	{
 		MenuSwitcher->SetActiveWidgetIndex(static_cast<int32>(Panel));
 	}
-	BuildNavForPanel(Panel);
+
+	// CommonUI handles navigation between focusable buttons; we just move focus to the panel's first.
+	if (UWidget* Focus = GetPanelFocusTarget(Panel))
+	{
+		Focus->SetFocus();
+	}
 }
 
-void UMainMenuWidget::BuildNavForPanel(EMenuPanel Panel)
+UWidget* UMainMenuWidget::GetPanelFocusTarget(EMenuPanel Panel) const
 {
-	TArray<UButton*> Buttons;
 	switch (Panel)
 	{
-	case EMenuPanel::Root:
-		Buttons = { SoloButton, MultiplayerButton, OptionsButton, QuitButton };
-		break;
-	case EMenuPanel::Multiplayer:
-		Buttons = { CreateButton, JoinButton, MultiplayerBackButton };
-		break;
-	case EMenuPanel::Options:
-	{
-		// Sliders (if the WBP embeds them) then the Back button — a mixed widget list.
-		TArray<UWidget*> Widgets;
-		if (AudioOptions)
-		{
-			Widgets.Append(AudioOptions->GetNavWidgets());
-		}
-		Widgets.Add(OptionsBackButton);
-		SetNavWidgets(Widgets);
-		return;
+	case EMenuPanel::Root:        return SoloButton;
+	case EMenuPanel::Multiplayer: return CreateButton;
+	case EMenuPanel::Options:     return OptionsBackButton;
+	case EMenuPanel::Browser:     return RefreshButton;
+	default:                      return SoloButton;
 	}
-	case EMenuPanel::Browser:
-		if (ServerListBox)
-		{
-			for (int32 i = 0; i < ServerListBox->GetChildrenCount(); ++i)
-			{
-				if (const UServerRowWidget* Row = Cast<UServerRowWidget>(ServerListBox->GetChildAt(i)))
-				{
-					Buttons.Add(Row->GetJoinButton());
-				}
-			}
-		}
-		Buttons.Add(RefreshButton);
-		Buttons.Add(BrowserBackButton);
-		break;
-	}
-	SetNavButtons(Buttons);
 }
 
-void UMainMenuWidget::HandleBack()
+UWidget* UMainMenuWidget::NativeGetDesiredFocusTarget() const
 {
-	// Any sub-panel goes back to the root list; the root itself does nothing.
+	return GetPanelFocusTarget(CurrentPanel);
+}
+
+bool UMainMenuWidget::NativeOnHandleBackAction()
+{
+	// Any sub-panel goes back to the root list; the root itself does nothing. Always consume Back so
+	// the activatable stack never pops the main menu out from under the player.
 	if (CurrentPanel != EMenuPanel::Root)
 	{
 		ShowPanel(EMenuPanel::Root);
 	}
+	return true;
 }
 
 // ---------------------------------------------------------------- Root buttons
@@ -260,12 +251,6 @@ void UMainMenuWidget::HandleFindDone(int32 NumResults)
 	}
 
 	SetBrowserStatus(FString::Printf(TEXT("%d partie(s) trouvée(s)."), NumResults));
-
-	// The row buttons were just rebuilt; refresh navigation if the browser is showing.
-	if (CurrentPanel == EMenuPanel::Browser)
-	{
-		BuildNavForPanel(EMenuPanel::Browser);
-	}
 }
 
 void UMainMenuWidget::HandleJoinDone(bool bSuccess)

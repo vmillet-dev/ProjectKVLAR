@@ -5,8 +5,9 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/GameplayAbility_Spell.h"
-#include "Core/AlchemistPlayerState.h"
-#include "Spells/SpellGenerationSettings.h"
+#include "Player/AlchemistPlayerState.h"
+#include "Spells/SpellConfig.h"
+#include "Spells/SpellRegistrySubsystem.h"
 #include "Spells/ElementDefinition.h"
 #include "Spells/FormDefinition.h"
 #include "Spells/ModifierDefinition.h"
@@ -102,9 +103,10 @@ void USpellCasterComponent::ServerInitializeAbilities()
 		// Fresh run: one independent spell per hand. Only the server generates; the results replicate
 		// from the PlayerState as FSpellDefinition, so all clients agree without re-rolling.
 		PS->MarkStartingSpellsRolled();
+		USpellRegistrySubsystem* Registry = USpellRegistrySubsystem::Get(this);
 		FRandomStream Rng(FMath::Rand());
-		EquipSpell(EHand::Left, USpellGenerator::GenerateRandomSpell(Rng));
-		EquipSpell(EHand::Right, USpellGenerator::GenerateRandomSpell(Rng));
+		EquipSpell(EHand::Left, USpellGenerator::GenerateRandomSpell(Registry, Rng));
+		EquipSpell(EHand::Right, USpellGenerator::GenerateRandomSpell(Registry, Rng));
 	}
 	else
 	{
@@ -139,9 +141,9 @@ void USpellCasterComponent::EquipSpell(EHand Hand, const FSpellDefinition& Spell
 
 	// Resolve the form to its ability class (fall back to the safety-net ability if it can't be found).
 	TSubclassOf<UGameplayAbility> AbilityClass = FallbackSpellAbility;
-	if (USpellGenerationSettings* Settings = GetMutableDefault<USpellGenerationSettings>())
+	if (USpellRegistrySubsystem* Registry = USpellRegistrySubsystem::Get(this))
 	{
-		if (const UFormDefinition* Form = Settings->FindForm(Spell.Form))
+		if (const UFormDefinition* Form = Registry->FindForm(Spell.Form))
 		{
 			if (Form->AbilityClass)
 			{
@@ -207,8 +209,9 @@ void USpellCasterComponent::RecordCastAndTryCombo(EHand Hand)
 	Record.Modifiers = Spell.Modifiers;
 	Record.Time = Now;
 
-	const USpellGenerationSettings* Settings = GetDefault<USpellGenerationSettings>();
-	const float Window = Settings ? Settings->ComboWindow : 0.35f;
+	USpellRegistrySubsystem* Registry = USpellRegistrySubsystem::Get(this);
+	const USpellConfig* Config = Registry ? Registry->GetConfig() : nullptr;
+	const float Window = Config ? Config->ComboWindow : 0.35f;
 
 	if (LastLeftCast.Element.IsValid() && LastRightCast.Element.IsValid()
 		&& (Now - LastLeftCast.Time) <= Window && (Now - LastRightCast.Time) <= Window)
@@ -225,8 +228,9 @@ void USpellCasterComponent::TriggerCombo()
 {
 	UAbilitySystemComponent* ASC = GetASC();
 	const AAlchemistPlayerState* PS = GetAlchemistPlayerState();
-	USpellGenerationSettings* Settings = GetMutableDefault<USpellGenerationSettings>();
-	if (!ASC || !PS || !PS->ComboHandle.IsValid() || !Settings)
+	USpellRegistrySubsystem* Registry = USpellRegistrySubsystem::Get(this);
+	const USpellConfig* Config = Registry ? Registry->GetConfig() : nullptr;
+	if (!ASC || !PS || !PS->ComboHandle.IsValid() || !Config)
 	{
 		return;
 	}
@@ -234,8 +238,8 @@ void USpellCasterComponent::TriggerCombo()
 	const FGameplayTag LeftElement = LastLeftCast.Element;
 	const FGameplayTag RightElement = LastRightCast.Element;
 
-	const UElementDefinition* LeftDef = Settings->FindElement(LeftElement);
-	const UElementDefinition* RightDef = Settings->FindElement(RightElement);
+	const UElementDefinition* LeftDef = Registry->FindElement(LeftElement);
+	const UElementDefinition* RightDef = Registry->FindElement(RightElement);
 	const FLinearColor LeftColor = LeftDef ? LeftDef->Color : FLinearColor::White;
 	const FLinearColor RightColor = RightDef ? RightDef->Color : FLinearColor::White;
 
@@ -244,13 +248,13 @@ void USpellCasterComponent::TriggerCombo()
 	if (LeftElement == RightElement)
 	{
 		// Amplification: identical elements double the damage and fuse the (identical) colour.
-		Multiplier = Settings->SameElementComboMultiplier;
+		Multiplier = Config->SameElementComboMultiplier;
 		BlendedColor = LeftColor;
 	}
-	else if (Settings->AreElementsOpposed(LeftElement, RightElement))
+	else if (Config->AreElementsOpposed(LeftElement, RightElement))
 	{
 		// Reaction: opposed elements explode harder; add the colours for a brighter blend.
-		Multiplier = Settings->OpposedComboMultiplier;
+		Multiplier = Config->OpposedComboMultiplier;
 		BlendedColor = LeftColor + RightColor;
 	}
 	else
@@ -263,7 +267,7 @@ void USpellCasterComponent::TriggerCombo()
 	const FGameplayTagContainer SharedModifiers = LastLeftCast.Modifiers.FilterExact(LastRightCast.Modifiers);
 	for (const FGameplayTag& ModifierTag : SharedModifiers)
 	{
-		if (const UModifierDefinition* Modifier = Settings->FindModifier(ModifierTag))
+		if (const UModifierDefinition* Modifier = Registry->FindModifier(ModifierTag))
 		{
 			Multiplier *= Modifier->DamageScale;
 		}

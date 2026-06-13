@@ -6,32 +6,28 @@
 #include "Blueprint/UserWidget.h"
 #include "AudioOptionsWidget.generated.h"
 
-class USlider;
+class UAnalogSlider;
 class UTextBlock;
-class UWidget;
-class UGameAudioSubsystem;
+class UAudioSubsystem;
 
 /**
  * Reusable options panel holding the Master / Music / SFX volume sliders. Embedded in both the
- * main-menu and the in-game pause menu. The sliders apply their value live to UGameAudioSubsystem
- * and persist on release. Gamepad/keyboard focus and left/right adjustment are driven by the
- * parent UMenuNavWidget, which fetches the sliders through GetNavWidgets().
+ * main-menu and the in-game pause screens. The sliders apply their value live to UAudioSubsystem;
+ * UAnalogSlider makes them adjustable with the gamepad when focused, and CommonUI handles navigating
+ * to them, so no manual nav wiring is needed. Volumes persist on mouse release and on panel close.
  */
 UCLASS()
 class KITCHENUNDERPRESSURE_API UAudioOptionsWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
-public:
-	// Sliders to hand to the parent menu's navigation list (Master, Music, SFX order).
-	TArray<UWidget*> GetNavWidgets() const;
-
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 
-	UPROPERTY(meta = (BindWidget)) USlider* MasterSlider;
-	UPROPERTY(meta = (BindWidget)) USlider* MusicSlider;
-	UPROPERTY(meta = (BindWidget)) USlider* SfxSlider;
+	UPROPERTY(meta = (BindWidget)) UAnalogSlider* MasterSlider;
+	UPROPERTY(meta = (BindWidget)) UAnalogSlider* MusicSlider;
+	UPROPERTY(meta = (BindWidget)) UAnalogSlider* SfxSlider;
 
 	UPROPERTY(meta = (BindWidgetOptional)) UTextBlock* MasterValueText;
 	UPROPERTY(meta = (BindWidgetOptional)) UTextBlock* MusicValueText;
@@ -45,7 +41,7 @@ private:
 	// Mouse-drag finished on any slider: write the volumes to disk once.
 	UFUNCTION() void OnSliderReleased();
 
-	void InitSlider(USlider* Slider, float Value, UTextBlock* ValueText);
+	void InitSlider(UAnalogSlider* Slider, float Value, UTextBlock* ValueText);
 	void UpdateValueText(UTextBlock* Text, float Value) const;
-	UGameAudioSubsystem* GetGameAudio() const;
+	UAudioSubsystem* GetGameAudio() const;
 };

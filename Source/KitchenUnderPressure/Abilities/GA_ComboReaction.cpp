@@ -5,7 +5,7 @@
 #include "Spells/ComboBurst.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "Core/KUPCombatStatics.h"
+#include "System/KUPCombatStatics.h"
 #include "GameFramework/Actor.h"
 #include "Engine/World.h"
 #include "Engine/OverlapResult.h"

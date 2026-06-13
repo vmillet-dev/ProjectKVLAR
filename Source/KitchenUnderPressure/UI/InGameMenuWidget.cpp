@@ -3,54 +3,48 @@
 
 #include "InGameMenuWidget.h"
 #include "AudioOptionsWidget.h"
-#include "Core/KitchenUnderPressurePlayerController.h"
+#include "Player/KitchenUnderPressurePlayerController.h"
 #include "OnlineSessionSubsystem.h"
-#include "Components/Button.h"
+#include "Base/KUPButton.h"
+#include "Components/Widget.h"
 #include "Components/WidgetSwitcher.h"
 #include "Engine/GameInstance.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Settings/GameMapSettings.h"
 
+UInGameMenuWidget::UInGameMenuWidget()
+{
+	// Back closes the options page or the whole menu (see NativeOnHandleBackAction).
+	bIsBackHandler = true;
+}
+
 void UInGameMenuWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (ContinueButton)    ContinueButton->OnClicked.AddDynamic(this, &UInGameMenuWidget::OnContinueClicked);
-	if (OptionsButton)     OptionsButton->OnClicked.AddDynamic(this, &UInGameMenuWidget::OnOptionsClicked);
-	if (MainMenuButton)    MainMenuButton->OnClicked.AddDynamic(this, &UInGameMenuWidget::OnMainMenuClicked);
-	if (QuitButton)        QuitButton->OnClicked.AddDynamic(this, &UInGameMenuWidget::OnQuitClicked);
-	if (OptionsBackButton) OptionsBackButton->OnClicked.AddDynamic(this, &UInGameMenuWidget::OnOptionsBackClicked);
+	if (ContinueButton)    ContinueButton->OnClicked().AddUObject(this, &UInGameMenuWidget::OnContinueClicked);
+	if (OptionsButton)     OptionsButton->OnClicked().AddUObject(this, &UInGameMenuWidget::OnOptionsClicked);
+	if (MainMenuButton)    MainMenuButton->OnClicked().AddUObject(this, &UInGameMenuWidget::OnMainMenuClicked);
+	if (QuitButton)        QuitButton->OnClicked().AddUObject(this, &UInGameMenuWidget::OnQuitClicked);
+	if (OptionsBackButton) OptionsBackButton->OnClicked().AddUObject(this, &UInGameMenuWidget::OnOptionsBackClicked);
 
 	if (MenuSwitcher) MenuSwitcher->SetActiveWidgetIndex(0);
-
-	BuildNav();
 }
 
-void UInGameMenuWidget::BuildNav()
+bool UInGameMenuWidget::IsOnOptionsPage() const
 {
-	// Switcher page 1 is the options panel; everything else is the main button list.
-	const int32 Page = MenuSwitcher ? MenuSwitcher->GetActiveWidgetIndex() : 0;
-	if (Page == 1)
-	{
-		// Sliders (if the WBP embeds them) then the Back button — a mixed widget list.
-		TArray<UWidget*> Widgets;
-		if (AudioOptions)
-		{
-			Widgets.Append(AudioOptions->GetNavWidgets());
-		}
-		Widgets.Add(OptionsBackButton);
-		SetNavWidgets(Widgets);
-	}
-	else
-	{
-		SetNavButtons({ ContinueButton, OptionsButton, MainMenuButton, QuitButton });
-	}
+	return MenuSwitcher && MenuSwitcher->GetActiveWidgetIndex() == 1;
 }
 
-void UInGameMenuWidget::HandleBack()
+UWidget* UInGameMenuWidget::NativeGetDesiredFocusTarget() const
 {
-	if (MenuSwitcher && MenuSwitcher->GetActiveWidgetIndex() == 1)
+	return IsOnOptionsPage() ? static_cast<UWidget*>(OptionsBackButton) : static_cast<UWidget*>(ContinueButton);
+}
+
+bool UInGameMenuWidget::NativeOnHandleBackAction()
+{
+	if (IsOnOptionsPage())
 	{
 		OnOptionsBackClicked();
 	}
@@ -58,6 +52,7 @@ void UInGameMenuWidget::HandleBack()
 	{
 		OnContinueClicked();
 	}
+	return true;
 }
 
 void UInGameMenuWidget::OnContinueClicked()
@@ -72,13 +67,13 @@ void UInGameMenuWidget::OnContinueClicked()
 void UInGameMenuWidget::OnOptionsClicked()
 {
 	if (MenuSwitcher) MenuSwitcher->SetActiveWidgetIndex(1);
-	BuildNav();
+	if (OptionsBackButton) OptionsBackButton->SetFocus();
 }
 
 void UInGameMenuWidget::OnOptionsBackClicked()
 {
 	if (MenuSwitcher) MenuSwitcher->SetActiveWidgetIndex(0);
-	BuildNav();
+	if (ContinueButton) ContinueButton->SetFocus();
 }
 
 void UInGameMenuWidget::OnMainMenuClicked()

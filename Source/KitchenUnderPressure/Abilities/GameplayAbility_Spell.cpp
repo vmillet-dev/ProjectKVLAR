@@ -6,7 +6,8 @@
 #include "CollisionQueryParams.h"
 #include "AbilitySystemComponent.h"
 #include "Spells/SpellCasterComponent.h"
-#include "Spells/SpellGenerationSettings.h"
+#include "Spells/SpellConfig.h"
+#include "Spells/SpellRegistrySubsystem.h"
 #include "Spells/ElementDefinition.h"
 #include "Spells/FormDefinition.h"
 #include "Spells/ModifierDefinition.h"
@@ -47,9 +48,9 @@ float UGameplayAbility_Spell::GetEffectiveCooldownSeconds() const
 	FSpellDefinition Spell;
 	if (TryGetEquippedSpell(Spell) && Spell.IsValid())
 	{
-		if (USpellGenerationSettings* Settings = GetMutableDefault<USpellGenerationSettings>())
+		if (USpellRegistrySubsystem* Registry = USpellRegistrySubsystem::Get(this))
 		{
-			if (const UFormDefinition* Form = Settings->FindForm(Spell.Form))
+			if (const UFormDefinition* Form = Registry->FindForm(Spell.Form))
 			{
 				return Form->CooldownSeconds;
 			}
@@ -160,14 +161,14 @@ void UGameplayAbility_Spell::ResolvePayload(float& OutDamage, FLinearColor& OutC
 		return;
 	}
 
-	USpellGenerationSettings* Settings = GetMutableDefault<USpellGenerationSettings>();
-	if (!Settings)
+	USpellRegistrySubsystem* Registry = USpellRegistrySubsystem::Get(this);
+	if (!Registry)
 	{
 		return;
 	}
 
-	const UElementDefinition* Element = Settings->FindElement(Spell.Element);
-	const UFormDefinition* Form = Settings->FindForm(Spell.Form);
+	const UElementDefinition* Element = Registry->FindElement(Spell.Element);
+	const UFormDefinition* Form = Registry->FindForm(Spell.Form);
 
 	const float Base = Element ? Element->BaseDamage : Damage;
 	const float FormMultiplier = Form ? Form->DamageMultiplier : 1.f;
@@ -179,7 +180,7 @@ void UGameplayAbility_Spell::ResolvePayload(float& OutDamage, FLinearColor& OutC
 	// Power curve alone ("1-2 paramètres poussés à l'extrême").
 	for (const FGameplayTag& ModifierTag : Spell.Modifiers)
 	{
-		if (const UModifierDefinition* Modifier = Settings->FindModifier(ModifierTag))
+		if (const UModifierDefinition* Modifier = Registry->FindModifier(ModifierTag))
 		{
 			OutDamage *= Modifier->DamageScale;
 		}
@@ -191,9 +192,12 @@ void UGameplayAbility_Spell::ResolvePayload(float& OutDamage, FLinearColor& OutC
 
 TSubclassOf<UGameplayEffect> UGameplayAbility_Spell::GetDamageEffectClass() const
 {
-	if (const USpellGenerationSettings* Settings = GetDefault<USpellGenerationSettings>())
+	if (USpellRegistrySubsystem* Registry = USpellRegistrySubsystem::Get(this))
 	{
-		return Settings->DamageEffect;
+		if (const USpellConfig* Config = Registry->GetConfig())
+		{
+			return Config->DamageEffect;
+		}
 	}
 	return nullptr;
 }

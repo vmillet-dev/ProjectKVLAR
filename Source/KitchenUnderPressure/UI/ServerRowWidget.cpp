@@ -3,7 +3,7 @@
 
 #include "ServerRowWidget.h"
 #include "OnlineSessionSubsystem.h"
-#include "Components/Button.h"
+#include "Base/KUPButton.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
 
@@ -13,7 +13,7 @@ void UServerRowWidget::NativeConstruct()
 
 	if (JoinRowButton)
 	{
-		JoinRowButton->OnClicked.AddDynamic(this, &UServerRowWidget::OnJoinRowClicked);
+		JoinRowButton->OnClicked().AddUObject(this, &UServerRowWidget::OnJoinRowClicked);
 	}
 }
 

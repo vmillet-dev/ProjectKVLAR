@@ -34,7 +34,7 @@ enum class ESpellRarity : uint8
 /**
  * A procedurally generated spell, described by tags + scalars only (no asset pointers) so it
  * replicates cheaply by value and is resolved to its data assets locally through
- * USpellGenerationSettings. The element + form + modifiers are the three GDD layers.
+ * USpellRegistrySubsystem. The element + form + modifiers are the three GDD layers.
  */
 USTRUCT(BlueprintType)
 struct FSpellDefinition

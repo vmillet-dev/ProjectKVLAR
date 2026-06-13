@@ -4,7 +4,8 @@
 #include "LobbyWidget.h"
 #include "LobbyPlayerController.h"
 #include "LobbyPlayerState.h"
-#include "Components/Button.h"
+#include "Base/KUPButton.h"
+#include "Components/Widget.h"
 #include "Components/TextBlock.h"
 #include "Components/ScrollBox.h"
 #include "Blueprint/WidgetTree.h"
@@ -13,16 +14,19 @@
 #include "TimerManager.h"
 #include "Engine/World.h"
 
+ULobbyWidget::ULobbyWidget()
+{
+	// Back leaves the lobby (see NativeOnHandleBackAction).
+	bIsBackHandler = true;
+}
+
 void ULobbyWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (ReadyButton) ReadyButton->OnClicked.AddDynamic(this, &ULobbyWidget::OnReadyClicked);
-	if (StartButton) StartButton->OnClicked.AddDynamic(this, &ULobbyWidget::OnStartClicked);
-	if (LeaveButton) LeaveButton->OnClicked.AddDynamic(this, &ULobbyWidget::OnLeaveClicked);
-
-	// Start is skipped automatically while it is collapsed/disabled (non-host or not all ready).
-	SetNavButtons({ ReadyButton, StartButton, LeaveButton });
+	if (ReadyButton) ReadyButton->OnClicked().AddUObject(this, &ULobbyWidget::OnReadyClicked);
+	if (StartButton) StartButton->OnClicked().AddUObject(this, &ULobbyWidget::OnStartClicked);
+	if (LeaveButton) LeaveButton->OnClicked().AddUObject(this, &ULobbyWidget::OnLeaveClicked);
 
 	// Poll the replicated player list on a timer rather than wiring per-property
 	// replication callbacks — simple and more than enough for a small lobby.
@@ -41,6 +45,17 @@ void ULobbyWidget::NativeDestruct()
 		World->GetTimerManager().ClearTimer(RefreshTimer);
 	}
 	Super::NativeDestruct();
+}
+
+UWidget* ULobbyWidget::NativeGetDesiredFocusTarget() const
+{
+	return ReadyButton;
+}
+
+bool ULobbyWidget::NativeOnHandleBackAction()
+{
+	OnLeaveClicked();
+	return true;
 }
 
 void ULobbyWidget::OnReadyClicked()
@@ -72,11 +87,6 @@ void ULobbyWidget::OnLeaveClicked()
 	{
 		PC->LeaveLobby();
 	}
-}
-
-void ULobbyWidget::HandleBack()
-{
-	OnLeaveClicked();
 }
 
 void ULobbyWidget::RefreshList()
@@ -112,15 +122,13 @@ void ULobbyWidget::RefreshList()
 			FString::Printf(TEXT("Joueurs : %d  (prêts : %d)"), Num, ReadyCount)));
 	}
 
-	// Only the host may start, and only when every connected player is ready.
+	// Only the host may start, and only when every connected player is ready. CommonUI keeps focus
+	// valid as Start's enabled/visible state changes.
 	if (StartButton)
 	{
 		StartButton->SetVisibility(IsHost() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 		StartButton->SetIsEnabled(IsHost() && Num > 0 && ReadyCount == Num);
 	}
-
-	// Start's navigability may have just changed; re-validate the focused index.
-	ApplyHighlight();
 }
 
 ALobbyPlayerController* ULobbyWidget::GetLobbyPC() const

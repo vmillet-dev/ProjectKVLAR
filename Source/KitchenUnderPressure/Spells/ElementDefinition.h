@@ -12,7 +12,7 @@ class UGameplayEffect;
 
 /**
  * Spell layer 1 (Element): the damage type, its colour and its on-hit status effect. Authored as a
- * data asset and resolved at runtime from FSpellDefinition.Element via USpellGenerationSettings.
+ * data asset and resolved at runtime from FSpellDefinition.Element via USpellRegistrySubsystem.
  */
 UCLASS()
 class KITCHENUNDERPRESSURE_API UElementDefinition : public UPrimaryDataAsset

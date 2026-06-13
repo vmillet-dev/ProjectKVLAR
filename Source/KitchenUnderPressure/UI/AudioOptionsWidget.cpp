@@ -1,8 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "AudioOptionsWidget.h"
-#include "Subsystem/GameAudioSubsystem.h"
-#include "Components/Slider.h"
+#include "Audio/AudioSubsystem.h"
+#include "AnalogSlider.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
 
@@ -10,7 +10,7 @@ void UAudioOptionsWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	const UGameAudioSubsystem* Audio = GetGameAudio();
+	const UAudioSubsystem* Audio = GetGameAudio();
 	const float Master = Audio ? Audio->GetMasterVolume() : 1.f;
 	const float Music = Audio ? Audio->GetMusicVolume() : 1.f;
 	const float Sfx = Audio ? Audio->GetSfxVolume() : 1.f;
@@ -37,7 +37,17 @@ void UAudioOptionsWidget::NativeConstruct()
 	}
 }
 
-void UAudioOptionsWidget::InitSlider(USlider* Slider, float Value, UTextBlock* ValueText)
+void UAudioOptionsWidget::NativeDestruct()
+{
+	// Persist on close so gamepad/keyboard adjustments (which don't fire OnMouseCaptureEnd) are saved.
+	if (UAudioSubsystem* Audio = GetGameAudio())
+	{
+		Audio->SaveSettings();
+	}
+	Super::NativeDestruct();
+}
+
+void UAudioOptionsWidget::InitSlider(UAnalogSlider* Slider, float Value, UTextBlock* ValueText)
 {
 	if (Slider)
 	{
@@ -50,7 +60,7 @@ void UAudioOptionsWidget::InitSlider(USlider* Slider, float Value, UTextBlock* V
 
 void UAudioOptionsWidget::OnMasterChanged(float Value)
 {
-	if (UGameAudioSubsystem* Audio = GetGameAudio())
+	if (UAudioSubsystem* Audio = GetGameAudio())
 	{
 		Audio->SetMasterVolume(Value);
 	}
@@ -59,7 +69,7 @@ void UAudioOptionsWidget::OnMasterChanged(float Value)
 
 void UAudioOptionsWidget::OnMusicChanged(float Value)
 {
-	if (UGameAudioSubsystem* Audio = GetGameAudio())
+	if (UAudioSubsystem* Audio = GetGameAudio())
 	{
 		Audio->SetMusicVolume(Value);
 	}
@@ -68,7 +78,7 @@ void UAudioOptionsWidget::OnMusicChanged(float Value)
 
 void UAudioOptionsWidget::OnSfxChanged(float Value)
 {
-	if (UGameAudioSubsystem* Audio = GetGameAudio())
+	if (UAudioSubsystem* Audio = GetGameAudio())
 	{
 		Audio->SetSfxVolume(Value);
 	}
@@ -77,7 +87,7 @@ void UAudioOptionsWidget::OnSfxChanged(float Value)
 
 void UAudioOptionsWidget::OnSliderReleased()
 {
-	if (UGameAudioSubsystem* Audio = GetGameAudio())
+	if (UAudioSubsystem* Audio = GetGameAudio())
 	{
 		Audio->SaveSettings();
 	}
@@ -91,16 +101,7 @@ void UAudioOptionsWidget::UpdateValueText(UTextBlock* Text, float Value) const
 	}
 }
 
-TArray<UWidget*> UAudioOptionsWidget::GetNavWidgets() const
+UAudioSubsystem* UAudioOptionsWidget::GetGameAudio() const
 {
-	TArray<UWidget*> Widgets;
-	if (MasterSlider) { Widgets.Add(MasterSlider); }
-	if (MusicSlider)  { Widgets.Add(MusicSlider); }
-	if (SfxSlider)    { Widgets.Add(SfxSlider); }
-	return Widgets;
-}
-
-UGameAudioSubsystem* UAudioOptionsWidget::GetGameAudio() const
-{
-	return GetGameInstance() ? GetGameInstance()->GetSubsystem<UGameAudioSubsystem>() : nullptr;
+	return GetGameInstance() ? GetGameInstance()->GetSubsystem<UAudioSubsystem>() : nullptr;
 }

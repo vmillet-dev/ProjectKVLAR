@@ -5,9 +5,10 @@
 #include "Abilities/AlchemistAbilitySystemComponent.h"
 #include "Attributes/AlchemistAttributeSet.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "Core/KUPCombatStatics.h"
+#include "System/KUPCombatStatics.h"
 #include "KUPGameplayTags.h"
-#include "Spells/SpellGenerationSettings.h"
+#include "Spells/SpellConfig.h"
+#include "Spells/SpellRegistrySubsystem.h"
 #include "Spells/ElementDefinition.h"
 #include "Spells/ComboBurst.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -112,14 +113,15 @@ void AEnemyCharacter::TryMeleeAttack(AActor* Target)
 void AEnemyCharacter::NotifyElementalHit(UAbilitySystemComponent* SourceASC, const FGameplayTag& Element)
 {
 	UWorld* World = GetWorld();
-	USpellGenerationSettings* Settings = GetMutableDefault<USpellGenerationSettings>();
-	if (!HasAuthority() || bDead || !SourceASC || !Element.IsValid() || !World || !Settings)
+	USpellRegistrySubsystem* Registry = USpellRegistrySubsystem::Get(this);
+	const USpellConfig* Config = Registry ? Registry->GetConfig() : nullptr;
+	if (!HasAuthority() || bDead || !SourceASC || !Element.IsValid() || !World || !Config)
 	{
 		return;
 	}
 
 	const float Now = World->GetTimeSeconds();
-	const float Window = Settings->CrossPlayerComboWindow;
+	const float Window = Config->CrossPlayerComboWindow;
 
 	// A second player landing the opposed element within the window completes the reaction. Both
 	// hands of one player share an ASC, so the "different source" check leaves the solo two-hand
@@ -128,7 +130,7 @@ void AEnemyCharacter::NotifyElementalHit(UAbilitySystemComponent* SourceASC, con
 	{
 		if ((Now - Record.Time) <= Window
 			&& Record.SourceASC.IsValid() && Record.SourceASC.Get() != SourceASC
-			&& Settings->AreElementsOpposed(Record.Element, Element))
+			&& Config->AreElementsOpposed(Record.Element, Element))
 		{
 			TriggerCrossPlayerCombo(Record, SourceASC, Element);
 			RecentElementalHits.Reset(); // the pair is consumed
@@ -150,27 +152,28 @@ void AEnemyCharacter::NotifyElementalHit(UAbilitySystemComponent* SourceASC, con
 void AEnemyCharacter::TriggerCrossPlayerCombo(const FElementalHitRecord& FirstHit, UAbilitySystemComponent* SecondASC, const FGameplayTag& SecondElement)
 {
 	UWorld* World = GetWorld();
-	USpellGenerationSettings* Settings = GetMutableDefault<USpellGenerationSettings>();
-	if (!World || !Settings)
+	USpellRegistrySubsystem* Registry = USpellRegistrySubsystem::Get(this);
+	const USpellConfig* Config = Registry ? Registry->GetConfig() : nullptr;
+	if (!World || !Config)
 	{
 		return;
 	}
 
-	const UElementDefinition* FirstDef = Settings->FindElement(FirstHit.Element);
-	const UElementDefinition* SecondDef = Settings->FindElement(SecondElement);
+	const UElementDefinition* FirstDef = Registry->FindElement(FirstHit.Element);
+	const UElementDefinition* SecondDef = Registry->FindElement(SecondElement);
 
 	// Same recipe as the solo opposed reaction: summed base damage, boosted, brighter blended colour.
 	const float BaseDamage = (FirstDef ? FirstDef->BaseDamage : 25.f) + (SecondDef ? SecondDef->BaseDamage : 25.f);
-	const float ReactionDamage = BaseDamage * Settings->OpposedComboMultiplier;
+	const float ReactionDamage = BaseDamage * Config->OpposedComboMultiplier;
 	const FLinearColor Color = (FirstDef ? FirstDef->Color : FLinearColor::White) + (SecondDef ? SecondDef->Color : FLinearColor::White);
 
 	// The reaction's plain damage GE carries no element, so it can never re-enter NotifyElementalHit.
 	// Attributed to the player who completed the pair.
-	UKUPCombatStatics::ApplyAreaDamage(World, SecondASC, GetActorLocation(), Settings->CrossPlayerComboRadius, ReactionDamage, Settings->DamageEffect, nullptr);
+	UKUPCombatStatics::ApplyAreaDamage(World, SecondASC, GetActorLocation(), Config->CrossPlayerComboRadius, ReactionDamage, Config->DamageEffect, nullptr);
 
 	if (AComboBurst* Burst = World->SpawnActor<AComboBurst>(AComboBurst::StaticClass(), GetActorLocation(), FRotator::ZeroRotator))
 	{
-		Burst->InitBurst(Color, Settings->CrossPlayerComboRadius);
+		Burst->InitBurst(Color, Config->CrossPlayerComboRadius);
 	}
 }
 

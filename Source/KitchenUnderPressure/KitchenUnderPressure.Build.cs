@@ -23,16 +23,23 @@ public class KitchenUnderPressure : ModuleRules
 			"DeveloperSettings",
 			"GameplayAbilities",
 			"GameplayTags",
-			"GameplayTasks"
+			"GameplayTasks",
+			"CommonUI",
+			"CommonInput",
+			"AudioModulation"
 		]);
 
 		PublicIncludePaths.AddRange([
 			"KitchenUnderPressure",
-			"KitchenUnderPressure/Core",
+			"KitchenUnderPressure/GameModes",
+			"KitchenUnderPressure/Player",
+			"KitchenUnderPressure/Character",
+			"KitchenUnderPressure/Camera",
+			"KitchenUnderPressure/System",
 			"KitchenUnderPressure/Input",
 			"KitchenUnderPressure/Interaction",
 			"KitchenUnderPressure/Settings",
-			"KitchenUnderPressure/Subsystem",
+			"KitchenUnderPressure/Online",
 			"KitchenUnderPressure/UI"
 		]);
 

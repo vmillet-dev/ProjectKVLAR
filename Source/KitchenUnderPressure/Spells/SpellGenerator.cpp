@@ -1,20 +1,20 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SpellGenerator.h"
-#include "SpellGenerationSettings.h"
+#include "SpellConfig.h"
+#include "SpellRegistrySubsystem.h"
 #include "ElementDefinition.h"
 #include "FormDefinition.h"
 #include "ModifierDefinition.h"
 
-ESpellRarity USpellGenerator::RollRarity(FRandomStream& Rng)
+ESpellRarity USpellGenerator::RollRarity(const USpellConfig* Config, FRandomStream& Rng)
 {
-	const USpellGenerationSettings* Settings = GetDefault<USpellGenerationSettings>();
-	if (!Settings)
+	if (!Config)
 	{
 		return ESpellRarity::Common;
 	}
 
-	const float Total = Settings->CommonWeight + Settings->RareWeight + Settings->EpicWeight + Settings->LegendaryWeight;
+	const float Total = Config->CommonWeight + Config->RareWeight + Config->EpicWeight + Config->LegendaryWeight;
 	if (Total <= 0.f)
 	{
 		return ESpellRarity::Common;
@@ -22,34 +22,39 @@ ESpellRarity USpellGenerator::RollRarity(FRandomStream& Rng)
 
 	// Walk the cumulative weights from common (most likely) to legendary.
 	float Roll = Rng.FRandRange(0.f, Total);
-	if ((Roll -= Settings->CommonWeight) < 0.f) { return ESpellRarity::Common; }
-	if ((Roll -= Settings->RareWeight) < 0.f)   { return ESpellRarity::Rare; }
-	if ((Roll -= Settings->EpicWeight) < 0.f)   { return ESpellRarity::Epic; }
+	if ((Roll -= Config->CommonWeight) < 0.f) { return ESpellRarity::Common; }
+	if ((Roll -= Config->RareWeight) < 0.f)   { return ESpellRarity::Rare; }
+	if ((Roll -= Config->EpicWeight) < 0.f)   { return ESpellRarity::Epic; }
 	return ESpellRarity::Legendary;
 }
 
-FSpellDefinition USpellGenerator::GenerateRandomSpell(FRandomStream& Rng)
+FSpellDefinition USpellGenerator::GenerateRandomSpell(USpellRegistrySubsystem* Registry, FRandomStream& Rng)
 {
 	FSpellDefinition Out;
 
-	USpellGenerationSettings* Settings = GetMutableDefault<USpellGenerationSettings>();
-	if (!Settings)
+	if (!Registry)
 	{
 		return Out;
 	}
 
-	const TArray<TObjectPtr<UElementDefinition>>& Elements = Settings->GetLoadedElements();
-	const TArray<TObjectPtr<UFormDefinition>>& Forms = Settings->GetLoadedForms();
-	const TArray<TObjectPtr<UModifierDefinition>>& Modifiers = Settings->GetLoadedModifiers();
+	const USpellConfig* Config = Registry->GetConfig();
+	if (!Config)
+	{
+		return Out;
+	}
+
+	const TArray<TObjectPtr<UElementDefinition>>& Elements = Registry->GetLoadedElements();
+	const TArray<TObjectPtr<UFormDefinition>>& Forms = Registry->GetLoadedForms();
+	const TArray<TObjectPtr<UModifierDefinition>>& Modifiers = Registry->GetLoadedModifiers();
 	if (Elements.Num() == 0 || Forms.Num() == 0)
 	{
 		// Leaves Out invalid; callers guard on IsValid() and skip equipping.
 		return Out;
 	}
 
-	const ESpellRarity Rarity = RollRarity(Rng);
+	const ESpellRarity Rarity = RollRarity(Config, Rng);
 	Out.Rarity = Rarity;
-	Out.Power = Settings->GetPowerForRarity(Rarity) * Rng.FRandRange(0.9f, 1.1f);
+	Out.Power = Config->GetPowerForRarity(Rarity) * Rng.FRandRange(0.9f, 1.1f);
 
 	if (const UElementDefinition* Element = Elements[Rng.RandRange(0, Elements.Num() - 1)])
 	{

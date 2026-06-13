@@ -3,34 +3,39 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "MenuNavWidget.h"
+#include "Base/KUPActivatableWidget.h"
 #include "LobbyWidget.generated.h"
 
-class UButton;
+class UKUPButton;
 class UTextBlock;
 class UScrollBox;
+class UWidget;
 class ALobbyPlayerController;
 
 /**
- * Waiting-room UI. Periodically rebuilds the player list from the replicated
- * PlayerArray, toggles the local ready flag, and lets the host start the match.
+ * Waiting-room screen (CommonUI activatable). Periodically rebuilds the player list from the
+ * replicated PlayerArray, toggles the local ready flag, and lets the host start the match.
+ * Back leaves the lobby and returns to the main menu.
  */
 UCLASS()
-class KITCHENUNDERPRESSURE_API ULobbyWidget : public UMenuNavWidget
+class KITCHENUNDERPRESSURE_API ULobbyWidget : public UKUPActivatableWidget
 {
 	GENERATED_BODY()
+
+public:
+	ULobbyWidget();
 
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	// "Back" leaves the lobby and returns to the main menu.
-	virtual void HandleBack() override;
+	virtual UWidget* NativeGetDesiredFocusTarget() const override;
+	virtual bool NativeOnHandleBackAction() override;
 
 	UPROPERTY(meta = (BindWidget)) UScrollBox* PlayerListBox;
-	UPROPERTY(meta = (BindWidget)) UButton* ReadyButton;
-	UPROPERTY(meta = (BindWidget)) UButton* StartButton;
-	UPROPERTY(meta = (BindWidget)) UButton* LeaveButton;
+	UPROPERTY(meta = (BindWidget)) UKUPButton* ReadyButton;
+	UPROPERTY(meta = (BindWidget)) UKUPButton* StartButton;
+	UPROPERTY(meta = (BindWidget)) UKUPButton* LeaveButton;
 	UPROPERTY(meta = (BindWidget)) UTextBlock* StatusText;
 	UPROPERTY(meta = (BindWidget)) UTextBlock* CountText;
 

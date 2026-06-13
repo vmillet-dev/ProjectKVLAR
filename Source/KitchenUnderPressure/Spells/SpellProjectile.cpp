@@ -7,7 +7,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "Core/KUPCombatStatics.h"
+#include "System/KUPCombatStatics.h"
 #include "Enemies/EnemyCharacter.h"
 #include "KUPGameplayTags.h"
 #include "UObject/ConstructorHelpers.h"

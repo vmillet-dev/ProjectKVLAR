@@ -3,7 +3,7 @@
 #include "GA_NovaSpell.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "Core/KUPCombatStatics.h"
+#include "System/KUPCombatStatics.h"
 #include "Enemies/EnemyCharacter.h"
 #include "GameFramework/Actor.h"
 #include "Engine/World.h"
