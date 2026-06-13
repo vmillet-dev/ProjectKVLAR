@@ -91,16 +91,12 @@ void AKitchenUnderPressurePlayerController::ToggleInGameMenu()
 	}
 	bMenuOpen = true;
 
-	// Solo (standalone) freezes the world; multiplayer keeps running.
+	// CommonUI applies the menu input config (input routed to UI, cursor hidden on gamepad) when the
+	// screen activates. Solo (standalone) freezes the world; multiplayer keeps running.
 	if (GetNetMode() == NM_Standalone)
 	{
 		UGameplayStatics::SetGamePaused(this, true);
 	}
-
-	FInputModeGameAndUI InputMode;
-	InputMode.SetHideCursorDuringCapture(false);
-	SetInputMode(InputMode);
-	bShowMouseCursor = true;
 }
 
 void AKitchenUnderPressurePlayerController::CloseInGameMenu()

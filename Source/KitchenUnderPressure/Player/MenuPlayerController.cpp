@@ -28,7 +28,8 @@ void AMenuPlayerController::BeginPlay()
 	}
 
 	// CommonUI: push the main menu onto the primary layout. The UI subsystem owns the widget, and
-	// CommonUI handles focus, gamepad/keyboard/mouse routing and the Back action.
+	// CommonUI handles focus, gamepad/keyboard/mouse routing, the Back action, the input mode and the
+	// cursor (shown for mouse, hidden on gamepad) via the screen's GetDesiredInputConfig.
 	if (ULocalPlayer* LP = GetLocalPlayer())
 	{
 		if (UKUPUISubsystem* UI = LP->GetSubsystem<UKUPUISubsystem>())
@@ -36,10 +37,4 @@ void AMenuPlayerController::BeginPlay()
 			UI->PushScreen(MainMenuClass);
 		}
 	}
-
-	// Keep the mouse usable; CommonUI's input subsystem manages gamepad focus and the cursor.
-	FInputModeGameAndUI InputMode;
-	InputMode.SetHideCursorDuringCapture(false);
-	SetInputMode(InputMode);
-	bShowMouseCursor = true;
 }

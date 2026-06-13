@@ -22,7 +22,8 @@ void ALobbyPlayerController::BeginPlay()
 		return;
 	}
 
-	// CommonUI: push the lobby screen onto the primary layout; CommonUI owns focus and input routing.
+	// CommonUI: push the lobby screen onto the primary layout; CommonUI owns focus, input routing and
+	// the cursor (via the screen's GetDesiredInputConfig).
 	if (ULocalPlayer* LP = GetLocalPlayer())
 	{
 		if (UKUPUISubsystem* UI = LP->GetSubsystem<UKUPUISubsystem>())
@@ -30,11 +31,6 @@ void ALobbyPlayerController::BeginPlay()
 			UI->PushScreen(LobbyWidgetClass);
 		}
 	}
-
-	FInputModeGameAndUI InputMode;
-	InputMode.SetHideCursorDuringCapture(false);
-	SetInputMode(InputMode);
-	bShowMouseCursor = true;
 }
 
 void ALobbyPlayerController::ServerSetReady_Implementation(bool bReady)
